@@ -1,0 +1,30 @@
+{
+    "file_id": "Ciaocccdcnisc",
+    "days": {
+        "gio": {
+            "sheet_id": "0",
+            "sheet_name": "Gio Example",
+            "day_string": "Gio Example Day"
+        },
+        "ven": {
+            "sheet_id": "0",
+            "sheet_name": "Ven Example",
+            "day_string": "Ven Example Day"
+        },
+        "sab": {
+            "sheet_id": "0",
+            "sheet_name": "Sab Example",
+            "day_string": "Sab Example Day"
+        },
+        "dom": {
+            "sheet_id": "0",
+            "sheet_name": "Dom Example",
+            "day_string": "Dom Example Day"
+        },
+        "lun": {
+            "sheet_id": "0",
+            "sheet_name": "Lun Example",
+            "day_string": "Lun Example Day"
+        }
+    }
+}
