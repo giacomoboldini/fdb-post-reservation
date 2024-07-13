@@ -3,8 +3,7 @@ from tkinter import messagebox
 import json
 from app_configurator import AppConfigurator
 import pygsheets
-from google.oauth2 import service_account
-from Utils import google_login
+import utils
 
 
 class App(tk.Tk):
@@ -14,12 +13,12 @@ class App(tk.Tk):
         self.geometry("600x400")
 
         self.config = self.load_config()
-        self.secrets = self.load_secrets()
+        # self.secrets = self.load_secrets()
         self.configurator = None
 
-        if not self.secrets:
-            self.destroy()
-            return
+        # if not self.secrets:
+        #     self.destroy()
+        #     return
 
         # if not self.config:
         #     self.configure_options()
@@ -73,30 +72,23 @@ class App(tk.Tk):
 
     def create_status_widgets(self):
         # Check Google Sheet connection
-        if self.check_google_status():
+        if utils.check_google_login():
             self.google_status_label = tk.Label(self, text="Google Sheet: Connected")
         else:
             self.google_status_label = tk.Label(self, text="Google Sheet: Disconnected")
         self.google_status_label.pack()
-        self.google_connect_button = tk.Button(self, text="Connect to Google Sheet", command=self.google_connect)
+        self.google_connect_button = tk.Button(self, text="Connect to Google Sheet", command=self.google_connect())
         self.google_connect_button.pack()
 
-
-    def check_google_status(self) -> bool:
-
-        try:
-            creds = google_login()
-            if creds:
-                self.google_status = True
-            else:
-                self.google_status = False
-            return self.google_status
-        except Exception as e:
-            self.google_status = False
-            return self.google_status
+    def update_status_widgets(self):
+        if utils.check_google_login():
+            self.google_status_label.config(text="Google Sheet: Connected")
+        else:
+            self.google_status_label.config(text="Google Sheet: Disconnected")
 
     def google_connect(self):
-        pygsheets.authorize(service_file='secrets.json')
+        self.google_creds = utils.google_login()
+        self.update_status_widgets()
 
 if __name__ == "__main__":
     app = App()
