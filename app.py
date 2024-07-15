@@ -12,9 +12,13 @@ class App(tk.Tk):
         self.title("FDB Post Reservation")
         self.geometry("600x400")
 
-        self.config = self.load_config()
+        self.create_widgets()
+        self.update_status_widgets()
+
+
+        # self.config = self.load_config()
         # self.secrets = self.load_secrets()
-        self.configurator = None
+        # self.configurator = None
 
         # if not self.secrets:
         #     self.destroy()
@@ -23,11 +27,31 @@ class App(tk.Tk):
         # if not self.config:
         #     self.configure_options()
 
-        self.create_status_widgets()
+        # self.create_status_widgets()
 
         # Create a button for configuring options
         # self.configure_button = tk.Button(self, text="Configure Options", command=self.configure_options)
         # self.configure_button.pack()
+
+    def create_widgets(self) -> None:
+        labelframe = tk.LabelFrame(self, text="Connections")
+        labelframe.pack(padx=10, pady=10, anchor='w', fill="x")
+
+        # Google API
+        google_label = tk.Label(labelframe, text="Google API", anchor="w", width=15)
+        google_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.google_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
+        self.google_status.grid(row=0, column=1, padx=10, pady=5)
+        google_button = tk.Button(labelframe, text="Connect", command=self.google_connect)
+        google_button.grid(row=0, column=2, padx=10, pady=5)
+
+        # Whatsapp API
+        whatsapp_label = tk.Label(labelframe, text="Whatsapp API", anchor="w", width=15)
+        whatsapp_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        self.whatsapp_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
+        self.whatsapp_status.grid(row=1, column=1, padx=10, pady=5)
+        whatsapp_button = tk.Button(labelframe, text="Connect")#, command=lambda: self.connect_api("Whatsapp API"))
+        whatsapp_button.grid(row=1, column=2, padx=10, pady=5)
 
     def load_secrets(self):
         try:
@@ -70,21 +94,11 @@ class App(tk.Tk):
         else:
             messagebox.showwarning("No Selection", "Please select at least one day.")
 
-    def create_status_widgets(self):
-        # Check Google Sheet connection
-        if utils.check_google_login():
-            self.google_status_label = tk.Label(self, text="Google Sheet: Connected")
-        else:
-            self.google_status_label = tk.Label(self, text="Google Sheet: Disconnected")
-        self.google_status_label.pack()
-        self.google_connect_button = tk.Button(self, text="Connect to Google Sheet", command=self.google_connect())
-        self.google_connect_button.pack()
-
     def update_status_widgets(self):
         if utils.check_google_login():
-            self.google_status_label.config(text="Google Sheet: Connected")
+            self.google_status.config(text="●", fg="green")
         else:
-            self.google_status_label.config(text="Google Sheet: Disconnected")
+            self.google_status.config(text="●", fg="red")
 
     def google_connect(self):
         self.google_creds = utils.google_login()

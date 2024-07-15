@@ -35,6 +35,7 @@ def google_login(creds_file='google_secrets.json',
         login_again = messagebox.askyesno("Google Login", "Do you want to login to Google again?")
         if not login_again:
             creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+            return creds
         else:
             os.remove(token_file)
 
