@@ -15,8 +15,11 @@ class App(tk.Tk):
 
         # Load settings from settings.ini
         self.settings = self.load_settings()
-
+        
+        # Create widgets
         self.create_widgets()
+
+        # Fill with the data
         self.update_ui()
         self.update_status_widgets()
 
@@ -40,7 +43,7 @@ class App(tk.Tk):
     def create_widgets(self) -> None:
 
         # Test
-        self.test_label = tk.Label(self, text=self.settings.get("message"), anchor="w", width=15)
+        self.test_label = tk.Label(self, text=self.settings["Other"]["message"], anchor="w", width=15)
         self.test_label.pack(padx=10, pady=5, anchor='w')
         settings_button = tk.Button(self, text='Settings', command=self.open_settings_window)
         settings_button.pack(pady=10)
@@ -68,40 +71,64 @@ class App(tk.Tk):
         self.whatsapp_info.grid(row=2, column=0, columnspan=3, padx=10, pady=0, sticky="w")
         self.whatsapp_info.grid_remove()
 
-    def load_settings(self):
+    def load_settings(self) -> dict:
         config = configparser.ConfigParser()
         config.read('settings.ini')
-        settings = {}
-
-        if 'General' in config:
-            settings['message'] = config['General'].get('message', '')
-            # Add more settings as needed
-
+        settings = dict()
+        for section in config.sections():
+            items=config.items(section)
+            settings[section]=dict(items)
         return settings
 
     def open_settings_window(self):
         settings_window = tk.Toplevel(self)
         settings_window.title('Settings')
 
+        print(self.settings)
+
+        # For each category (except sheet-* and general)
+        entries = {}
+        row = 0
+        for sect in self.settings:
+            if sect not in ["General"]:
+                entries[sect] = {}
+                sect_label = tk.Label(settings_window, text=sect)
+                sect_label.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
+                row = row + 1
+
+                for key, val in self.settings[sect].items():
+                    label = tk.Label(settings_window, text=key)
+                    entries[sect][key] = tk.Entry(settings_window, textvariable=tk.StringVar(value=val))
+                    label.grid(row=row, column=0, padx=10, pady=5)
+                    entries[sect][key].grid(row=row, column=1, padx=10, pady=5)
+                    row = row + 1
+
+
         # Create and populate settings widgets based on self.settings
         # Example:
-        message_label = tk.Label(settings_window, text='Message:')
-        message_entry = tk.Entry(settings_window, textvariable=tk.StringVar(value=self.settings.get('message', '')))
-        message_label.grid(row=0, column=0, padx=10, pady=5)
-        message_entry.grid(row=0, column=1, padx=10, pady=5)
+        # message_label = tk.Label(settings_window, text='Message:')
+        # message_entry = tk.Entry(settings_window, textvariable=tk.StringVar(value=self.settings.get('message', '')))
+        # message_label.grid(row=0, column=0, padx=10, pady=5)
+        # message_entry.grid(row=0, column=1, padx=10, pady=5)
 
         # Save button
-        save_button = tk.Button(settings_window, text='Save', command=lambda: self.save_settings(settings_window, message_entry.get()))
-        save_button.grid(row=1, column=1, pady=10)
+        save_button = tk.Button(settings_window, text='Save', command=lambda: self.save_settings(settings_window, entries))
+        save_button.grid(row=row, column=0, columnspan=2, pady=10)
 
-    def save_settings(self, settings_window, new_message):
-        # Update settings dictionary
-        self.settings['message'] = new_message
-
-        # Save settings to settings.ini
+    def save_settings(self, settings_window, entries):
+        settings = dict()
         config = configparser.ConfigParser()
-        config['General'] = {'message': new_message}
 
+        for sect in entries:
+            config.add_section(sect)
+            settings[sect] = dict()
+            for key in entries[sect]:
+                val = entries[sect][key].get()
+                config.set(sect,key,val)
+                settings[sect] = val
+        self.settings = settings
+        print(config)
+        # Save settings to settings.ini
         with open('settings.ini', 'w') as configfile:
             config.write(configfile)
 
@@ -170,6 +197,7 @@ class App(tk.Tk):
 
     def update_ui(self):
         self.test_label.config(text=self.settings.get("message"))
+        self.settings = self.load_settings()
         # self.update_status_widgets() # ??
 
     def google_connect(self):
