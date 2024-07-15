@@ -1,3 +1,4 @@
+import configparser
 import tkinter as tk
 from tkinter import messagebox
 import json
@@ -12,9 +13,12 @@ class App(tk.Tk):
         self.title("FDB Post Reservation")
         self.geometry("600x400")
 
-        self.create_widgets()
-        self.update_status_widgets()
+        # Load settings from settings.ini
+        self.settings = self.load_settings()
 
+        self.create_widgets()
+        self.update_ui()
+        self.update_status_widgets()
 
         # self.config = self.load_config()
         # self.secrets = self.load_secrets()
@@ -34,6 +38,14 @@ class App(tk.Tk):
         # self.configure_button.pack()
 
     def create_widgets(self) -> None:
+
+        # Test
+        self.test_label = tk.Label(self, text=self.settings.get("message"), anchor="w", width=15)
+        self.test_label.pack(padx=10, pady=5, anchor='w')
+        settings_button = tk.Button(self, text='Settings', command=self.open_settings_window)
+        settings_button.pack(pady=10)
+
+
         labelframe = tk.LabelFrame(self, text="Connections")
         labelframe.pack(padx=10, pady=10, anchor='w', fill="x")
 
@@ -55,6 +67,47 @@ class App(tk.Tk):
         self.whatsapp_info = tk.Label(labelframe, text="", fg="black", wraplength=500)
         self.whatsapp_info.grid(row=2, column=0, columnspan=3, padx=10, pady=0, sticky="w")
         self.whatsapp_info.grid_remove()
+
+    def load_settings(self):
+        config = configparser.ConfigParser()
+        config.read('settings.ini')
+        settings = {}
+
+        if 'General' in config:
+            settings['message'] = config['General'].get('message', '')
+            # Add more settings as needed
+
+        return settings
+
+    def open_settings_window(self):
+        settings_window = tk.Toplevel(self)
+        settings_window.title('Settings')
+
+        # Create and populate settings widgets based on self.settings
+        # Example:
+        message_label = tk.Label(settings_window, text='Message:')
+        message_entry = tk.Entry(settings_window, textvariable=tk.StringVar(value=self.settings.get('message', '')))
+        message_label.grid(row=0, column=0, padx=10, pady=5)
+        message_entry.grid(row=0, column=1, padx=10, pady=5)
+
+        # Save button
+        save_button = tk.Button(settings_window, text='Save', command=lambda: self.save_settings(settings_window, message_entry.get()))
+        save_button.grid(row=1, column=1, pady=10)
+
+    def save_settings(self, settings_window, new_message):
+        # Update settings dictionary
+        self.settings['message'] = new_message
+
+        # Save settings to settings.ini
+        config = configparser.ConfigParser()
+        config['General'] = {'message': new_message}
+
+        with open('settings.ini', 'w') as configfile:
+            config.write(configfile)
+
+        # Close settings window
+        settings_window.destroy()
+        self.update_ui()
 
     def load_secrets(self):
         try:
@@ -114,6 +167,10 @@ class App(tk.Tk):
             else:
                 self.whatsapp_info.config(text="")
                 self.whatsapp_info.grid_remove()
+
+    def update_ui(self):
+        self.test_label.config(text=self.settings.get("message"))
+        # self.update_status_widgets() # ??
 
     def google_connect(self):
         self.google_creds = utils.google_login()

@@ -105,7 +105,6 @@ def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='t
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
-            print(response)
             data = response.json()
             if 'data' in data:
                 return True, "Login successful."
