@@ -4,11 +4,17 @@
 
 - Create a pip virtual environment (e.g. called `venv`)
     ```
-    python3 -m venv venv
+    python -m venv venv
     ```
 - Activate it
+    
+    (linux)
     ```
     source venv/bin/activate
+    ```
+    (windows cmd)
+    ```
+    .\venv\Scripts\activate
     ```
 - Install requirements
     ```
