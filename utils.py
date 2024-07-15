@@ -1,11 +1,11 @@
 
+import json
 import os
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from tkinter import messagebox
-
-
+import requests
 
 
 def google_login(creds_file='google_secrets.json',
@@ -73,3 +73,50 @@ def check_google_login(token_file='sheets.googleapis.com-python.json'):
         creds = Credentials.from_authorized_user_file(token_file)
         return creds.valid
     return False
+
+
+def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='test'):
+    """
+    Check if the user is logged in to WhatsApp Business API by requesting the business profile.
+
+    Args:
+        secrets_file (str): The path to the secrets file.
+
+    Returns:
+        tuple: (bool, str) True if the login is successful, and an error message otherwise.
+    """
+    try:
+        # Load the secrets
+        with open(token_file, 'r') as f:
+            secrets = json.load(f)
+
+        access_token = secrets.get('access_token')
+        phone_number_id = secrets.get('phone_number_id')[phone_number_key]
+
+        if not access_token or not phone_number_id:
+            return False, "Missing access token or phone number ID in secrets file."
+
+        url = f'https://graph.facebook.com/v20.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical'
+
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            print(response)
+            data = response.json()
+            if 'data' in data:
+                return True, "Login successful."
+            else:
+                return False, "Unexpected response format."
+        else:
+            return False, f"API request failed with status code {response.status_code}: {response.text}"
+
+    except FileNotFoundError:
+        return False, "Secrets file not found."
+    except json.JSONDecodeError:
+        return False, "Error decoding secrets file."
+    except Exception as e:
+        return False, str(e)

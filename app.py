@@ -52,6 +52,9 @@ class App(tk.Tk):
         self.whatsapp_status.grid(row=1, column=1, padx=10, pady=5)
         whatsapp_button = tk.Button(labelframe, text="Connect")#, command=lambda: self.connect_api("Whatsapp API"))
         whatsapp_button.grid(row=1, column=2, padx=10, pady=5)
+        self.whatsapp_info = tk.Label(labelframe, text="", fg="black", wraplength=500)
+        self.whatsapp_info.grid(row=2, column=0, columnspan=3, padx=10, pady=0, sticky="w")
+        self.whatsapp_info.grid_remove()
 
     def load_secrets(self):
         try:
@@ -99,6 +102,18 @@ class App(tk.Tk):
             self.google_status.config(text="●", fg="green")
         else:
             self.google_status.config(text="●", fg="red")
+
+        whatsapp_status, message = utils.check_whatsapp_login("whatsapp_secrets.json", "iliad")
+        if whatsapp_status:
+            self.whatsapp_status.config(text="●", fg="green")
+        else:
+            self.whatsapp_status.config(text="●", fg="red")
+            if message:
+                self.whatsapp_info.config(text=message)
+                self.whatsapp_info.grid()
+            else:
+                self.whatsapp_info.config(text="")
+                self.whatsapp_info.grid_remove()
 
     def google_connect(self):
         self.google_creds = utils.google_login()
