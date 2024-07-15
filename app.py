@@ -1,13 +1,20 @@
 import configparser
 import tkinter as tk
-from tkinter import messagebox
 import json
 from app_configurator import AppConfigurator
 import pygsheets
 import utils
+import customtkinter as ctk
 
+# Sets the appearance mode of the application
+# "System" sets the appearance same as that of the system
+ctk.set_appearance_mode("System")        
+ 
+# Sets the color of the widgets
+# Supported themes: green, dark-blue, blue
+ctk.set_default_color_theme("green")  
 
-class App(tk.Tk):
+class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("FDB Post Reservation")
@@ -40,9 +47,9 @@ class App(tk.Tk):
     def create_widgets(self) -> None:
 
         # Test
-        self.test_label = tk.Label(self, text=self.settings.get("message"), anchor="w", width=15)
+        self.test_label = ctk.CTkLabel(self, text=self.settings.get("message"), anchor="w", width=15)
         self.test_label.pack(padx=10, pady=5, anchor='w')
-        settings_button = tk.Button(self, text='Settings', command=self.open_settings_window)
+        settings_button = ctk.CTkButton(self, text='Settings', command=self.open_settings_window)
         settings_button.pack(pady=10)
 
 
@@ -50,21 +57,21 @@ class App(tk.Tk):
         labelframe.pack(padx=10, pady=10, anchor='w', fill="x")
 
         # Google API
-        google_label = tk.Label(labelframe, text="Google API", anchor="w", width=15)
+        google_label = ctk.CTkLabel(labelframe, text="Google API", anchor="w", width=15)
         google_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.google_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
+        self.google_status = ctk.CTkLabel(labelframe, text="○", fg_color="black", width=2)  # Placeholder
         self.google_status.grid(row=0, column=1, padx=10, pady=5)
-        google_button = tk.Button(labelframe, text="Connect", command=self.google_connect)
+        google_button = ctk.CTkButton(labelframe, text="Connect", command=self.google_connect)
         google_button.grid(row=0, column=2, padx=10, pady=5)
 
         # Whatsapp API
-        whatsapp_label = tk.Label(labelframe, text="Whatsapp API", anchor="w", width=15)
+        whatsapp_label = ctk.CTkLabel(labelframe, text="Whatsapp API", anchor="w", width=15)
         whatsapp_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.whatsapp_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
+        self.whatsapp_status = ctk.CTkLabel(labelframe, text="○", fg_color="black", width=2)  # Placeholder
         self.whatsapp_status.grid(row=1, column=1, padx=10, pady=5)
-        whatsapp_button = tk.Button(labelframe, text="Connect")#, command=lambda: self.connect_api("Whatsapp API"))
+        whatsapp_button = ctk.CTkButton(labelframe, text="Connect")#, command=lambda: self.connect_api("Whatsapp API"))
         whatsapp_button.grid(row=1, column=2, padx=10, pady=5)
-        self.whatsapp_info = tk.Label(labelframe, text="", fg="black", wraplength=500)
+        self.whatsapp_info = ctk.CTkLabel(labelframe, text="", fg_color="black", wraplength=500)
         self.whatsapp_info.grid(row=2, column=0, columnspan=3, padx=10, pady=0, sticky="w")
         self.whatsapp_info.grid_remove()
 
@@ -80,18 +87,18 @@ class App(tk.Tk):
         return settings
 
     def open_settings_window(self):
-        settings_window = tk.Toplevel(self)
+        settings_window = ctk.CTkToplevel(self)
         settings_window.title('Settings')
 
         # Create and populate settings widgets based on self.settings
         # Example:
-        message_label = tk.Label(settings_window, text='Message:')
-        message_entry = tk.Entry(settings_window, textvariable=tk.StringVar(value=self.settings.get('message', '')))
+        message_label = ctk.CTkLabel(settings_window, text='Message:')
+        message_entry = ctk.CTkEntry(settings_window, textvariable=ctk.CTkStringVar(value=self.settings.get('message', '')))
         message_label.grid(row=0, column=0, padx=10, pady=5)
         message_entry.grid(row=0, column=1, padx=10, pady=5)
 
         # Save button
-        save_button = tk.Button(settings_window, text='Save', command=lambda: self.save_settings(settings_window, message_entry.get()))
+        save_button = ctk.CTkButton(settings_window, text='Save', command=lambda: self.save_settings(settings_window, message_entry.get()))
         save_button.grid(row=1, column=1, pady=10)
 
     def save_settings(self, settings_window, new_message):
@@ -152,24 +159,24 @@ class App(tk.Tk):
 
     def update_status_widgets(self):
         if utils.check_google_login():
-            self.google_status.config(text="●", fg="green")
+            self.google_status.configure(text="●", fg_color="green")
         else:
-            self.google_status.config(text="●", fg="red")
+            self.google_status.configure(text="●", fg_color="red")
 
         whatsapp_status, message = utils.check_whatsapp_login("whatsapp_secrets.json", "iliad")
         if whatsapp_status:
-            self.whatsapp_status.config(text="●", fg="green")
+            self.whatsapp_status.configure(text="●", fg_color="green")
         else:
-            self.whatsapp_status.config(text="●", fg="red")
+            self.whatsapp_status.configure(text="●", fg_color="red")
             if message:
-                self.whatsapp_info.config(text=message)
+                self.whatsapp_info.configure(text=message)
                 self.whatsapp_info.grid()
             else:
-                self.whatsapp_info.config(text="")
+                self.whatsapp_info.configure(text="")
                 self.whatsapp_info.grid_remove()
 
     def update_ui(self):
-        self.test_label.config(text=self.settings.get("message"))
+        self.test_label.configure(text=self.settings.get("message"))
         # self.update_status_widgets() # ??
 
     def google_connect(self):
