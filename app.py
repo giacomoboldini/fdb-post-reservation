@@ -1,11 +1,14 @@
 import configparser
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import json
 from app_configurator import AppConfigurator
 import pygsheets
 import utils
+import pandastable as pdt
+import pandas as pd
 
+# TODO: unify login with credentials (google)
 
 class App(tk.Tk):
     def __init__(self):
@@ -84,8 +87,39 @@ class App(tk.Tk):
         settings_button = tk.Button(settings_frame, text='Settings', command=self.open_settings_window)
         settings_button.pack(pady=10, anchor='e')
 
+        # Select day (dropdown)
+        day_label = tk.Label(self, text="Select Day:")
+        day_label.grid(row=1, column=0, padx=10, pady=5)
+        self.day_combobox = ttk.Combobox(self, values=[])
+        self.day_combobox.grid(row=1, column=1, padx=10, pady=5)
 
+        # Get data button
+        get_data_button = tk.Button(self, text="Get Data", command=self.get_data)
+        get_data_button.grid(row=2, column=0, padx=10, pady=5, columnspan=2)
 
+        # Table
+        self.table_frame = tk.Frame(self, height=400)
+        self.table_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+
+    def get_data(self):
+        print("Getting data... " + self.day_combobox.get())
+        day = self.day_combobox.get()
+        if not day:
+            messagebox.showwarning("No Day Selected", "Please select a day.")
+            return
+        # Get data from Google Sheets
+        file_id = self.settings.get("sheets").get("file_id")
+        day_settings = self.settings.get("day-" + day)
+        if not day_settings:
+            messagebox.showwarning("Day Not Configured", "Day not configured.")
+            return
+        print(day_settings)
+        df = utils.download_worksheet(file_id, day_settings.get("sheet_name"), self.settings.get("API").get("google_cred_file"))
+        print(df)
+        table = pdt.Table(self.table_frame, dataframe=df)
+        table.show()
+
+        return
 
     def load_settings(self) -> dict:
         config = configparser.ConfigParser()
@@ -198,6 +232,7 @@ class App(tk.Tk):
 
         if google_status:
             self.google_status.config(text="●", fg="green")
+            self.google_creds = utils.google_login(self.settings["API"]["google_cred_file"], self.settings["API"]["google_token_file"])
             print("Google login successful")
         else:
             self.google_status.config(text="●", fg="red")
@@ -222,9 +257,10 @@ class App(tk.Tk):
             # self.whatsapp_info.grid_remove()
 
     def update_ui(self):
-        self.test_label.config(text=self.settings.get("message"))
         self.settings = self.load_settings()
         self.update_status_widgets()
+        self.test_label.config(text=self.settings.get("message"))
+        self.day_combobox.config(values=self.settings.get("sheets").get("days").split(", "))
 
     def google_connect(self):
         self.google_creds = utils.google_login(self.settings["API"]["google_cred_file"], self.settings["API"]["google_token_file"])

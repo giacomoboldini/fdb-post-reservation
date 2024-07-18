@@ -1,2 +1,4 @@
 tk
 pygsheets
+pandas
+pandastable
