@@ -26,18 +26,14 @@ def google_login(creds_file='google_secrets.json',
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
               'https://www.googleapis.com/auth/drive']
 
-    creds = None
-
-    # Load credentials from token file if it exists.
-    if os.path.exists(token_file):
-        # Ask with a message box if the user wants to login again.
-        # If the user says no, return the existing credentials.
+    # Check if the user is already logged in.
+    google_login, _ = check_google_login(token_file)
+    if google_login:
         login_again = messagebox.askyesno("Google Login", "Do you want to login to Google again?")
         if not login_again:
-            creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-            return creds
-        else:
-            os.remove(token_file)
+            return None
+
+    creds = None
 
     message = "You are going to be prompted in the browser.\nFollow the instructions and authorize the app."
     messagebox.showinfo("OAuth Login", message)
@@ -59,7 +55,7 @@ def google_login(creds_file='google_secrets.json',
     return creds
 
 
-def check_google_login(token_file='sheets.googleapis.com-python.json'):
+def check_google_login(token_file='sheets.googleapis.com-python.json') -> (bool, str):
     """
     Check if the user is already logged in to Google services.
 
@@ -67,12 +63,27 @@ def check_google_login(token_file='sheets.googleapis.com-python.json'):
         token_file (str): The path to the token file.
 
     Returns:
-        bool: True if the user is already logged in, False otherwise.
+        tuple: (bool, str) True and account if the login is successful. False
+        and error message otherwise.
     """
-    if os.path.exists(token_file):
+    print("Checking Google login... " + token_file)
+    if not os.path.exists(token_file):
+        print("Token file not found.")
+        return False, "Token file not found."
+
+    try:
         creds = Credentials.from_authorized_user_file(token_file)
-        return creds.valid
-    return False
+        print("Credentials loaded:", creds)
+
+        if creds and creds.valid:
+            print("Credentials are valid.")
+            return True, creds.account
+        else:
+            print("Credentials are invalid.")
+            return False, "Login failed: Invalid credentials."
+    except Exception as e:
+        print("Error loading credentials:", str(e))
+        return False, f"Login failed: {str(e)}"
 
 
 def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='test'):

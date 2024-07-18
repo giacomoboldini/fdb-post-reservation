@@ -11,17 +11,16 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("FDB Post Reservation")
-        self.geometry("600x400")
+        self.geometry("1000x600")
 
         # Load settings from settings.ini
         self.settings = self.load_settings()
-        
+
         # Create widgets
         self.create_widgets()
 
         # Fill with the data
         self.update_ui()
-        self.update_status_widgets()
 
         # self.config = self.load_config()
         # self.secrets = self.load_secrets()
@@ -42,34 +41,51 @@ class App(tk.Tk):
 
     def create_widgets(self) -> None:
 
-        # Test
-        self.test_label = tk.Label(self, text=self.settings["Other"]["message"], anchor="w", width=15)
-        self.test_label.pack(padx=10, pady=5, anchor='w')
-        settings_button = tk.Button(self, text='Settings', command=self.open_settings_window)
-        settings_button.pack(pady=10)
 
+        # self.grid_columnconfigure(0, weight=1)
+        # self.grid_columnconfigure(1, weight=1)
 
-        labelframe = tk.LabelFrame(self, text="Connections")
-        labelframe.pack(padx=10, pady=10, anchor='w', fill="x")
+        # Connections LabelFrame
+        connections_frame = tk.LabelFrame(self, text="Connections")
+        connections_frame.grid(row=0, column=0, padx=10, pady=5, sticky="nsew")
+
+        # Configure grid for connections_frame
+        # connections_frame.grid_columnconfigure(0, weight=1)
+        # connections_frame.grid_columnconfigure(1, weight=0)
+        # connections_frame.grid_columnconfigure(2, weight=4)
+        # connections_frame.grid_columnconfigure(3, weight=1)
 
         # Google API
-        google_label = tk.Label(labelframe, text="Google API", anchor="w", width=15)
-        google_label.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.google_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
-        self.google_status.grid(row=0, column=1, padx=10, pady=5)
-        google_button = tk.Button(labelframe, text="Connect", command=self.google_connect)
-        google_button.grid(row=0, column=2, padx=10, pady=5)
+        google_label = tk.Label(connections_frame, text="Google API", anchor="w", width=13)
+        google_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        self.google_status = tk.Label(connections_frame, text="●", fg="green", width=2)  # Example status
+        self.google_status.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.google_info = tk.Label(connections_frame, text="", fg="black", width=30, anchor="w")
+        self.google_info.grid(row=0, column=2, padx=5, pady=5, sticky="w")
+        google_button = tk.Button(connections_frame, text="Connect", command=self.google_connect)
+        google_button.grid(row=0, column=3, padx=5, pady=5, sticky="e")
 
         # Whatsapp API
-        whatsapp_label = tk.Label(labelframe, text="Whatsapp API", anchor="w", width=15)
-        whatsapp_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-        self.whatsapp_status = tk.Label(labelframe, text="○", fg="black", width=2)  # Placeholder
-        self.whatsapp_status.grid(row=1, column=1, padx=10, pady=5)
-        whatsapp_button = tk.Button(labelframe, text="Connect")#, command=lambda: self.connect_api("Whatsapp API"))
-        whatsapp_button.grid(row=1, column=2, padx=10, pady=5)
-        self.whatsapp_info = tk.Label(labelframe, text="", fg="black", wraplength=500)
-        self.whatsapp_info.grid(row=2, column=0, columnspan=3, padx=10, pady=0, sticky="w")
-        self.whatsapp_info.grid_remove()
+        whatsapp_label = tk.Label(connections_frame, text="Whatsapp API", anchor="w", width=13)
+        whatsapp_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.whatsapp_status = tk.Label(connections_frame, text="●", fg="green", width=2)  # Example status
+        self.whatsapp_status.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self.whatsapp_info = tk.Label(connections_frame, text="", fg="black", width=30, anchor="w")
+        self.whatsapp_info.grid(row=1, column=2, padx=5, pady=5, sticky="w")
+        whatsapp_button = tk.Button(connections_frame, text="Connect", command=self.whatsapp_connect)
+        whatsapp_button.grid(row=1, column=3, padx=5, pady=5, sticky="e")
+
+        # Settings LabelFrame
+        settings_frame = tk.LabelFrame(self, text="Settings")
+        settings_frame.grid(row=0, column=1, padx=10, pady=5, sticky="nsew")
+
+        self.test_label = tk.Label(settings_frame, text=self.settings["Other"]["message"], anchor="w", width=15)
+        self.test_label.pack(padx=10, pady=5, anchor='w')
+        settings_button = tk.Button(settings_frame, text='Settings', command=self.open_settings_window)
+        settings_button.pack(pady=10, anchor='e')
+
+
+
 
     def load_settings(self) -> dict:
         config = configparser.ConfigParser()
@@ -178,30 +194,57 @@ class App(tk.Tk):
             messagebox.showwarning("No Selection", "Please select at least one day.")
 
     def update_status_widgets(self):
-        if utils.check_google_login():
+        google_status, goole_message = utils.check_google_login(self.settings["API"]["google_token_file"])
+
+        if google_status:
             self.google_status.config(text="●", fg="green")
+            print("Google login successful")
         else:
             self.google_status.config(text="●", fg="red")
+            print("Google login failed")
+        if goole_message:
+            self.google_info.config(text=goole_message)
+            self.google_info.grid()
+        else:
+            self.google_info.config(text="")
+            # self.whatsapp_info.grid_remove()
+        whatsapp_status, whatsapp_message = utils.check_whatsapp_login(self.settings.get("API").get("whatsapp_token_file"), "iliad")
 
-        whatsapp_status, message = utils.check_whatsapp_login("whatsapp_secrets.json", "iliad")
         if whatsapp_status:
             self.whatsapp_status.config(text="●", fg="green")
         else:
             self.whatsapp_status.config(text="●", fg="red")
-            if message:
-                self.whatsapp_info.config(text=message)
-                self.whatsapp_info.grid()
-            else:
-                self.whatsapp_info.config(text="")
-                self.whatsapp_info.grid_remove()
+        if whatsapp_message:
+            self.whatsapp_info.config(text=whatsapp_message)
+            self.whatsapp_info.grid()
+        else:
+            self.whatsapp_info.config(text="")
+            # self.whatsapp_info.grid_remove()
 
     def update_ui(self):
         self.test_label.config(text=self.settings.get("message"))
         self.settings = self.load_settings()
-        # self.update_status_widgets() # ??
+        self.update_status_widgets()
 
     def google_connect(self):
-        self.google_creds = utils.google_login()
+        self.google_creds = utils.google_login(self.settings["API"]["google_cred_file"], self.settings["API"]["google_token_file"])
+        self.update_status_widgets()
+
+    def whatsapp_connect(self):
+        # Try to reconnect...
+        self.whatsapp_creds = utils.whatsapp_login(self.settings["API"]["whatsapp_token_file"], "iliad")
+        # Show a message on how to connect to WhatsApp
+        message = "You need to configure Whastapp API and then create " + \
+            "a JSON file in the format:\n" + \
+            "{\n" + \
+            "  \"access_token\": \"[access_token]\"\n" + \
+            "  \"account_id\": \"[account_id]\"\n" + \
+            "  \"phone_number_id\": {\n" + \
+            "    \"id1\": \"[phone_number_id1]\"\n" + \
+            "    \"id2\": \"[phone_number_id2]\"\n" + \
+            "    ...\n" + \
+            "  }\n"
+        messagebox.showinfo("WhatsApp API", message)
         self.update_status_widgets()
 
 if __name__ == "__main__":
