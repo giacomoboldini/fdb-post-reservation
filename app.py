@@ -9,6 +9,8 @@ import pandastable as pdt
 import pandas as pd
 
 # TODO: unify login with credentials (google)
+# TODO-FIX: get data works despite google api not connected
+# TODO-FIX: table does not render after get data, manual scroll needed
 
 class App(tk.Tk):
     def __init__(self):
@@ -88,22 +90,42 @@ class App(tk.Tk):
         settings_button.pack(pady=10, anchor='e')
 
         # Select day (dropdown)
-        day_label = tk.Label(self, text="Select Day:")
-        day_label.grid(row=1, column=0, padx=10, pady=5)
-        self.day_combobox = ttk.Combobox(self, values=[])
-        self.day_combobox.grid(row=1, column=1, padx=10, pady=5)
+        get_data_frame = tk.Frame(self)
+        get_data_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+        day_label = tk.Label(get_data_frame, text="Select Day:")
+        day_label.pack(side="left", padx=10, pady=5)
+        self.day_combobox = ttk.Combobox(get_data_frame, values=[], state="readonly")
+        self.day_combobox.pack(side="left", padx=10, pady=5)
+        self.day_combobox.bind("<<ComboboxSelected>>", self.on_combobox_selected)
 
         # Get data button
-        get_data_button = tk.Button(self, text="Get Data", command=self.get_data)
-        get_data_button.grid(row=2, column=0, padx=10, pady=5, columnspan=2)
+        self.get_data_button = tk.Button(get_data_frame, text="Get Data", command=self.get_data, state="disabled")
+        self.get_data_button.pack(side="right", padx=10, pady=5)
 
         # Table
-        self.table_frame = tk.Frame(self, height=400)
-        self.table_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+        self.table_frame = tk.Frame(self, height=400, relief="solid", bd=1)
+        self.table_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+        self.df_table = pdt.Table(self.table_frame, dataframe=pd.DataFrame(), editable=False)
+        self.df_table.show()
+
+        # Action buttons
+        action_frame = tk.Frame(self)
+        action_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+        self.button_send = tk.Button(action_frame, text="Send WhatsApp", width=15, state="disabled")
+        self.button_send.pack(side="right", padx=10, pady=5)
+        self.button_map = tk.Button(action_frame, text="Gen Map PDF", width=15, state="disabled")
+        self.button_map.pack(side="right", padx=10, pady=5)
+        self.button_label = tk.Button(action_frame, text="Gen Labels PDF", width=15, state="disabled")
+        self.button_label.pack(side="right", padx=10, pady=5)
+
+    def on_combobox_selected(self, event):
+        self.get_data_button.config(state="normal")
+        self.df_table.clearTable()
 
     def get_data(self):
         print("Getting data... " + self.day_combobox.get())
         day = self.day_combobox.get()
+        # TODO: remove because button should be disabled if no day is selected
         if not day:
             messagebox.showwarning("No Day Selected", "Please select a day.")
             return
@@ -115,10 +137,13 @@ class App(tk.Tk):
             return
         print(day_settings)
         df = utils.download_worksheet(file_id, day_settings.get("sheet_name"), self.settings.get("API").get("google_cred_file"))
-        print(df)
-        table = pdt.Table(self.table_frame, dataframe=df)
-        table.show()
-
+        if not df.empty:
+            print(df)
+            self.df_table.model.df = df
+            self.df_table.show()
+            self.button_send.config(state="normal")
+            self.button_map.config(state="normal")
+            self.button_label.config(state="normal")
         return
 
     def load_settings(self) -> dict:
