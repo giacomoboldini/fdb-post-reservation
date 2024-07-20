@@ -2,3 +2,4 @@ tk
 pygsheets
 pandas
 pandastable
+fpdf

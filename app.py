@@ -94,7 +94,7 @@ class App(tk.Tk):
         get_data_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
         day_label = tk.Label(get_data_frame, text="Select Day:")
         day_label.pack(side="left", padx=10, pady=5)
-        self.day_combobox = ttk.Combobox(get_data_frame, values=[], state="readonly")
+        self.day_combobox = ttk.Combobox(get_data_frame, values=[], state="readonly", height=5)
         self.day_combobox.pack(side="left", padx=10, pady=5)
         self.day_combobox.bind("<<ComboboxSelected>>", self.on_combobox_selected)
 
@@ -113,14 +113,29 @@ class App(tk.Tk):
         action_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
         self.button_send = tk.Button(action_frame, text="Send WhatsApp", width=15, state="disabled")
         self.button_send.pack(side="right", padx=10, pady=5)
-        self.button_map = tk.Button(action_frame, text="Gen Map PDF", width=15, state="disabled")
+        self.button_map = tk.Button(action_frame, text="Gen Map PDF", width=15, state="disabled", command=self.generate_map)
         self.button_map.pack(side="right", padx=10, pady=5)
-        self.button_label = tk.Button(action_frame, text="Gen Labels PDF", width=15, state="disabled")
+        self.button_label = tk.Button(action_frame, text="Gen Labels PDF", width=15, state="disabled", command=self.generate_labels)
         self.button_label.pack(side="right", padx=10, pady=5)
 
     def on_combobox_selected(self, event):
         self.get_data_button.config(state="normal")
         self.df_table.clearTable()
+
+    def generate_labels(self):
+        df = self.df_table.model.df
+        if df.empty:
+            messagebox.showwarning("No Data", "No data to generate labels.")
+            return
+        utils.generate_table_labels_pdf(df, self.day_combobox.get(), "out")
+
+    def generate_map(self):
+        df = self.df_table.model.df
+        day = self.day_combobox.get()
+        if df.empty:
+            messagebox.showwarning("No Data", "No data to generate labels.")
+            return
+        utils.generate_map_pdf_png(self.google_creds, self.settings.get("sheets").get("file_id"), self.settings.get("day-" + day).get("sheet_id"), "out", day + "-map")
 
     def get_data(self):
         print("Getting data... " + self.day_combobox.get())
