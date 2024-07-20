@@ -123,21 +123,42 @@ class App(tk.Tk):
         self.df_table.clearTable()
 
     def generate_labels(self):
-        df = self.df_table.model.df
-        if df.empty:
-            messagebox.showwarning("No Data", "No data to generate labels.")
-            return
-        utils.generate_table_labels_pdf(df, self.day_combobox.get(), "out")
+        """
+        Generate the pdf with the labels starting from the data in the table.
 
-    def generate_map(self):
+        Returns:
+            None
+        """
         df = self.df_table.model.df
         day = self.day_combobox.get()
-        if df.empty:
-            messagebox.showwarning("No Data", "No data to generate labels.")
+        if df.empty or not day:
+            messagebox.showwarning("Missing data", "Failed to generate labels because no data or day selected.")
             return
-        utils.generate_map_pdf_png(self.google_creds, self.settings.get("sheets").get("file_id"), self.settings.get("day-" + day).get("sheet_id"), "out", day + "-map")
+        utils.generate_table_labels_pdf(df, day, "out")
+
+    def generate_map(self):
+        """
+        Generate the map pdf with the locations of the reservations.
+        Needs the Google API credentials to work.
+
+        Returns:
+            None
+        """
+        day = self.day_combobox.get()
+        if not day:
+            messagebox.showwarning("Missing Data", "Failed to generate map because no day selected.")
+            return
+        utils.google_generate_pdf_map(self.google_creds, self.settings.get("sheets").get("file_id"), self.settings.get("day-" + day).get("sheet_id"), "out", day + "-map")
 
     def get_data(self):
+        """
+        Download the data from the Google Sheets, save it in a dataframe and
+        show it in the table.
+        Needs the Google API credentials to work.
+
+        Returns:
+            None
+        """
         print("Getting data... " + self.day_combobox.get())
         day = self.day_combobox.get()
         # TODO: remove because button should be disabled if no day is selected
@@ -151,7 +172,7 @@ class App(tk.Tk):
             messagebox.showwarning("Day Not Configured", "Day not configured.")
             return
         print(day_settings)
-        df = utils.download_worksheet(file_id, day_settings.get("sheet_name"), self.settings.get("API").get("google_cred_file"))
+        df = utils.google_download_worksheet(self.google_creds, file_id, day_settings.get("sheet_name"))
         if not df.empty:
             print(df)
             self.df_table.model.df = df
@@ -268,21 +289,22 @@ class App(tk.Tk):
             messagebox.showwarning("No Selection", "Please select at least one day.")
 
     def update_status_widgets(self):
-        google_status, goole_message = utils.check_google_login(self.settings["API"]["google_token_file"])
+        google_token_file = self.settings["API"]["google_token_file"]
+        google_cred_file = self.settings["API"]["google_cred_file"]
+        self.google_creds, google_message = utils.google_login(google_cred_file, google_token_file, only_check=True)
 
-        if google_status:
+        if self.google_creds:
             self.google_status.config(text="●", fg="green")
-            self.google_creds = utils.google_login(self.settings["API"]["google_cred_file"], self.settings["API"]["google_token_file"])
             print("Google login successful")
         else:
             self.google_status.config(text="●", fg="red")
             print("Google login failed")
-        if goole_message:
-            self.google_info.config(text=goole_message)
+        if google_message:
+            self.google_info.config(text=google_message)
             self.google_info.grid()
         else:
             self.google_info.config(text="")
-            # self.whatsapp_info.grid_remove()
+        
         whatsapp_status, whatsapp_message = utils.check_whatsapp_login(self.settings.get("API").get("whatsapp_token_file"), "iliad")
 
         if whatsapp_status:

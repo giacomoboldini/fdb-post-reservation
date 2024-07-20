@@ -12,131 +12,80 @@ import pandas as pd
 from fpdf import FPDF
 
 
+### GOOGLE FUNCTIONS ###
+
+# TODO: retrieve the account name from the credentials
+
 def google_login(creds_file='google_secrets.json',
-                 token_file='sheets.googleapis.com-python.json'):
+                 token_file='sheets.googleapis.com-python.json',
+                 only_check=False) -> (Credentials, str):
     """
     Try a login to Google services using an already saved token. If the
-    token is expired, the user will be asked to login again and the new
-    token will be saved.
+    token is expired and only_check is False, the user will be prompted to
+    login again.
 
     Args:
         creds_file (str): The path to the client secrets file.
         token_file (str): The path to the token file.
+        only_check (bool): If True, only check if the user is logged in.
 
     Returns:
-        Credentials: The authenticated credentials.
+        tuple: (Credentials, str) The authenticated credentials and the account
+        name. None and an error message if the login fails.
+
     """
     # Authorization for both Google Sheets and Google Drive (like pygsheets).
     SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
               'https://www.googleapis.com/auth/drive']
+              #'https://www.googleapis.com/auth/userinfo.profile']
 
-    # Check if the user is already logged in.
-    google_login, _ = check_google_login(token_file)
-    if google_login:
-        login_again = messagebox.askyesno("Google Login", "Do you want to login to Google again?")
+    # Load the credentials from the token file.
+    ret_str = "Login successful."
+    try:
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+        if not creds or not creds.valid:
+            creds = None
+            ret_str = "Invalid credentials."
+        # else:
+        #     ret_str = creds.userinfo().get('email')
+    except FileNotFoundError:
+        creds = None
+        ret_str = "Token file not found."
+    except Exception as e:
+        creds = None
+        ret_str = str(e)
+
+    if only_check:
+        return creds, ret_str
+
+    if creds and creds.valid:
+        login_again = messagebox.askyesno("Google Login", "Do you want to do a new Google login?")
         if not login_again:
-            return None
+            return Credentials.from_authorized_user_file(token_file), ret_str
 
-    creds = None
-
+    # The user is not logged in or want to login again.
     message = "You are going to be prompted in the browser.\nFollow the instructions and authorize the app."
     messagebox.showinfo("OAuth Login", message)
 
-    # If there are no valid credentials, prompt the user to log in.
-    # Add instructions to the message box not in the terminal.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(creds_file,
-                                                             SCOPES)
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    else:
+        try:
+            flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
             creds = flow.run_local_server(port=0)
+        except Exception as e:
+            print(f"Error: {e}")
+            return None, str(e)
 
-        # Save the credentials for future use
-        with open(token_file, 'w') as token:
-            token.write(creds.to_json())
+    # Save the credentials for future use
+    with open(token_file, 'w') as token:
+        print("printing creds to json file " + token_file)
+        token.write(creds.to_json())
 
-    return creds
-
-
-def check_google_login(token_file='sheets.googleapis.com-python.json') -> (bool, str):
-    """
-    Check if the user is already logged in to Google services.
-
-    Args:
-        token_file (str): The path to the token file.
-
-    Returns:
-        tuple: (bool, str) True and account if the login is successful. False
-        and error message otherwise.
-    """
-    print("Checking Google login... " + token_file)
-    if not os.path.exists(token_file):
-        print("Token file not found.")
-        return False, "Token file not found."
-
-    try:
-        creds = Credentials.from_authorized_user_file(token_file)
-        print("Credentials loaded:", creds)
-
-        if creds and creds.valid:
-            print("Credentials are valid.")
-            return True, creds.account
-        else:
-            print("Credentials are invalid.")
-            return False, "Login failed: Invalid credentials."
-    except Exception as e:
-        print("Error loading credentials:", str(e))
-        return False, f"Login failed: {str(e)}"
+    return creds, creds.account
 
 
-def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='test'):
-    """
-    Check if the user is logged in to WhatsApp Business API by requesting the business profile.
-
-    Args:
-        secrets_file (str): The path to the secrets file.
-
-    Returns:
-        tuple: (bool, str) True if the login is successful, and an error message otherwise.
-    """
-    try:
-        # Load the secrets
-        with open(token_file, 'r') as f:
-            secrets = json.load(f)
-
-        access_token = secrets.get('access_token')
-        phone_number_id = secrets.get('phone_number_id')[phone_number_key]
-
-        if not access_token or not phone_number_id:
-            return False, "Missing access token or phone number ID in secrets file."
-
-        url = f'https://graph.facebook.com/v20.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical'
-
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            data = response.json()
-            if 'data' in data:
-                return True, "Login successful."
-            else:
-                return False, "Unexpected response format."
-        else:
-            return False, f"API request failed with status code {response.status_code}: {response.text}"
-
-    except FileNotFoundError:
-        return False, "Secrets file not found."
-    except json.JSONDecodeError:
-        return False, "Error decoding secrets file."
-    except Exception as e:
-        return False, str(e)
-
-
-def download_worksheet(file_id: str, sheet_name: str, google_secr: str) -> pd.DataFrame:
+def google_download_worksheet(creds: Credentials, file_id: str, sheet_name: str) -> pd.DataFrame:
     """
     Connect to Google Drive and get the specified worksheet from the Google Sheets
     file as a pandas dataframe. Also filter out unuseful columns and rows with no
@@ -150,7 +99,7 @@ def download_worksheet(file_id: str, sheet_name: str, google_secr: str) -> pd.Da
     """
     # Connect to Google Drive and get the spreadsheet.
     print(sheet_name)
-    client = pygsheets.authorize(google_secr)
+    client = pygsheets.authorize(custom_credentials=creds)
     spreadsheet = client.open_by_key(file_id)
     sheet = spreadsheet.worksheet_by_title(sheet_name)
 
@@ -178,12 +127,57 @@ def download_worksheet(file_id: str, sheet_name: str, google_secr: str) -> pd.Da
     return df
 
 
-def extract_number_and_letter(value):
-    match = re.match(r"(\d+)([A-Z])", value)
-    if match:
-        number, letter = match.groups()
-        return int(number), letter
-    return 0, ''  # Default return if the pattern does not match
+def google_generate_pdf_map(creds, file_id, sheet_id, output_dir, filename) -> None:
+    """
+    Generate a PDF of a specific range from a Google Sheet.
+
+    Args:
+        file_id (str): The ID of the Google Sheet file.
+        sheet_id (str): The ID of the specific sheet within the Google Sheet file.
+        output_dir (str): The directory to save the output files.
+        filename (str): The base name of the output files (without extension).
+
+    Raises:
+        Exception: If there is an issue downloading the PDF or converting it to PNG.
+    """
+
+    range = "t1:y43"
+    dwn_url = 'https://docs.google.com/spreadsheets/d/' + file_id \
+              + '/export?format=pdf&gid=' + sheet_id \
+              + "&range=" + range \
+              + "&scale=4&fith=true" \
+              + "&horizontal_alignment=CENTER&vertical_alignment=TOP" \
+              + "&gridlines=false"
+
+    authed_session = AuthorizedSession(creds)
+    if not authed_session:
+        raise Exception("Failed to authenticate with Google.")
+    response = authed_session.get(dwn_url)
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to download PDF. Status code: {response.status_code}")
+
+    # Create the output directory if it doesn't exist.
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Output the PDF file.
+    pdf_file_path = os.path.join(output_dir, f"{filename}.pdf")
+
+    with open(pdf_file_path, "wb") as f:
+        f.write(response.content)
+
+    print(f"File {pdf_file_path} written.")
+
+    # Convert PDF to PNG
+    # pages = convert_from_path(pdf_file_path, dpi=300)
+    # if len(pages) != 1:
+    #     raise Exception(
+    #         "PDF to PNG conversion resulted in more than one page.")
+    # png_file_path = os.path.join(output_dir, f"{filename}.png")
+    # pages[0].save(png_file_path, 'PNG')
+
+    # print(f"File {png_file_path} written.")
 
 
 def generate_table_labels_pdf(
@@ -265,54 +259,56 @@ def generate_table_labels_pdf(
     return
 
 
-def generate_map_pdf_png(creds, file_id, sheet_id, output_dir, filename) -> None:
+
+def extract_number_and_letter(value):
+    match = re.match(r"(\d+)([A-Z])", value)
+    if match:
+        number, letter = match.groups()
+        return int(number), letter
+    return 0, ''  # Default return if the pattern does not match
+
+
+def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='test'):
     """
-    Generate a PDF and a PNG of a specific range from a Google Sheet.
+    Check if the user is logged in to WhatsApp Business API by requesting the business profile.
 
     Args:
-        file_id (str): The ID of the Google Sheet file.
-        sheet_id (str): The ID of the specific sheet within the Google Sheet file.
-        output_dir (str): The directory to save the output files.
-        filename (str): The base name of the output files (without extension).
+        secrets_file (str): The path to the secrets file.
 
-    Raises:
-        Exception: If there is an issue downloading the PDF or converting it to PNG.
+    Returns:
+        tuple: (bool, str) True if the login is successful, and an error message otherwise.
     """
+    try:
+        # Load the secrets
+        with open(token_file, 'r') as f:
+            secrets = json.load(f)
 
-    range = "t1:y43"
-    dwn_url = 'https://docs.google.com/spreadsheets/d/' + file_id \
-              + '/export?format=pdf&gid=' + sheet_id \
-              + "&range=" + range \
-              + "&scale=4&fith=true" \
-              + "&horizontal_alignment=CENTER&vertical_alignment=TOP" \
-              + "&gridlines=false"
+        access_token = secrets.get('access_token')
+        phone_number_id = secrets.get('phone_number_id')[phone_number_key]
 
-    authed_session = AuthorizedSession(creds)
-    if not authed_session:
-        raise Exception("Failed to authenticate with Google.")
-    response = authed_session.get(dwn_url)
-    if response.status_code != 200:
-        raise Exception(
-            f"Failed to download PDF. Status code: {response.status_code}")
+        if not access_token or not phone_number_id:
+            return False, "Missing access token or phone number ID in secrets file."
 
-    # Create the output directory if it doesn't exist.
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+        url = f'https://graph.facebook.com/v20.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical'
 
-    # Output the PDF file.
-    pdf_file_path = os.path.join(output_dir, f"{filename}.pdf")
+        headers = {
+            'Authorization': f'Bearer {access_token}'
+        }
 
-    with open(pdf_file_path, "wb") as f:
-        f.write(response.content)
+        response = requests.get(url, headers=headers)
 
-    print(f"File {pdf_file_path} written.")
+        if response.status_code == 200:
+            data = response.json()
+            if 'data' in data:
+                return True, "Login successful."
+            else:
+                return False, "Unexpected response format."
+        else:
+            return False, f"API request failed with status code {response.status_code}: {response.text}"
 
-    # Convert PDF to PNG
-    # pages = convert_from_path(pdf_file_path, dpi=300)
-    # if len(pages) != 1:
-    #     raise Exception(
-    #         "PDF to PNG conversion resulted in more than one page.")
-    # png_file_path = os.path.join(output_dir, f"{filename}.png")
-    # pages[0].save(png_file_path, 'PNG')
-
-    # print(f"File {png_file_path} written.")
+    except FileNotFoundError:
+        return False, "Secrets file not found."
+    except json.JSONDecodeError:
+        return False, "Error decoding secrets file."
+    except Exception as e:
+        return False, str(e)
