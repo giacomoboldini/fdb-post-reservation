@@ -9,8 +9,7 @@ import pandastable as pdt
 import pandas as pd
 from connection import GoogleConnection, WhatsAppConnection
 
-# TODO-FIX: get data works despite google api not connected
-# TODO-FIX: table does not render after get data, manual scroll needed
+# TODO-FIX: get data works despite google api not connected - CHECK
 
 class App(tk.Tk):
 
@@ -125,7 +124,8 @@ class App(tk.Tk):
         self.button_label.pack(side="right", padx=(10,0), pady=5)
 
     def on_combobox_selected(self, event):
-        self.get_data_button.config(state="normal")
+        if self.google_connection.get_state() and self.day_combobox.get():
+            self.get_data_button.config(state="normal")
         self.my_clear_table(self.df_table)
 
     def generate_labels(self):
@@ -155,7 +155,7 @@ class App(tk.Tk):
             messagebox.showwarning("Missing Data", "Failed to generate map because no day selected.")
             return
         utils.google_generate_pdf_map(self.google_connection.get_credentials(), self.settings.get("sheets").get("file_id"), self.settings.get("day-" + day).get("sheet_id"), "out", day + "-map")
-
+    
     def get_data(self):
         """
         Download the data from the Google Sheets, save it in a dataframe and
@@ -171,24 +171,36 @@ class App(tk.Tk):
         if not day:
             messagebox.showwarning("No Day Selected", "Please select a day.")
             return
-        # Get data from Google Sheets
-        file_id = self.settings.get("sheets").get("file_id")
-        day_settings = self.settings.get("day-" + day)
-        if not day_settings:
-            messagebox.showwarning("Day Not Configured", "Day not configured.")
-            return
-        print(day_settings)
 
-        df = utils.google_download_worksheet(self.google_connection.get_credentials(), file_id, day_settings.get("sheet_name"))
+        # Show loading message box
+        loading_message = tk.Toplevel(self)
+        loading_message.title("Loading")
+        tk.Label(loading_message, text="Loading data, please wait...").pack(padx=20, pady=20)
+        loading_message.update()
 
-        if not df.empty:
-            print(df)
-            self.df_table.model.df = df
-            # self.df_table.after(100, lambda: self.df_table.movetoSelection(row=0))
-            self.df_table.show()
-            self.button_send.config(state="normal")
-            self.button_map.config(state="normal")
-            self.button_label.config(state="normal")
+        try:
+            # Get data from Google Sheets
+            file_id = self.settings.get("sheets").get("file_id")
+            day_settings = self.settings.get("day-" + day)
+            if not day_settings:
+                messagebox.showwarning("Day Not Configured", "Day not configured.")
+                return
+            print(day_settings)
+
+            df = utils.google_download_worksheet(self.google_connection.get_credentials(), file_id, day_settings.get("sheet_name"))
+
+            if not df.empty:
+                print(df)
+                self.df_table.model.df = df
+                self.df_table.show()
+                self.df_table.redraw()
+                self.button_send.config(state="normal")
+                self.button_map.config(state="normal")
+                self.button_label.config(state="normal")
+        finally:
+            self.update_idletasks()
+            # Close loading message box
+            loading_message.destroy()
         return
 
     def load_settings(self) -> dict:
@@ -312,6 +324,10 @@ class App(tk.Tk):
     def update_ui(self):
         self.settings = self.load_settings()
         self.update_status_widgets()
+        google_state = self.google_connection.get_state()
+        for button in [self.button_send, self.button_map, self.button_label, self.get_data_button]:
+            button.config(state="disabled" if not google_state else "normal")
+
         self.test_label.config(text=self.settings.get("message"))
         self.day_combobox.config(values=self.settings.get("sheets").get("days").split(", "))
 
@@ -320,6 +336,9 @@ class App(tk.Tk):
             self.settings.get("API").get("google_cred_file"),
             self.settings.get("API").get("google_token_file"))
         self.update_status_widgets()
+        google_state = self.google_connection.get_state()
+        for button in [self.button_send, self.button_map, self.button_label, self.get_data_button]:
+            button.config(state="disabled" if not google_state else "normal")
 
     def whatsapp_connect(self):
         self.whatsapp_connection.connect(
