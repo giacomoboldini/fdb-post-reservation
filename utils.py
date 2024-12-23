@@ -12,78 +12,6 @@ import pandas as pd
 from fpdf import FPDF
 
 
-### GOOGLE FUNCTIONS ###
-
-# TODO: retrieve the account name from the credentials
-
-def google_login(creds_file='google_secrets.json',
-                 token_file='sheets.googleapis.com-python.json',
-                 only_check=False) -> (Credentials, str):
-    """
-    Try a login to Google services using an already saved token. If the
-    token is expired and only_check is False, the user will be prompted to
-    login again.
-
-    Args:
-        creds_file (str): The path to the client secrets file.
-        token_file (str): The path to the token file.
-        only_check (bool): If True, only check if the user is logged in.
-
-    Returns:
-        tuple: (Credentials, str) The authenticated credentials and the account
-        name. None and an error message if the login fails.
-
-    """
-    # Authorization for both Google Sheets and Google Drive (like pygsheets).
-    SCOPES = ['https://www.googleapis.com/auth/spreadsheets',
-              'https://www.googleapis.com/auth/drive']
-              #'https://www.googleapis.com/auth/userinfo.profile']
-
-    # Load the credentials from the token file.
-    ret_str = "Login successful."
-    try:
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-        if not creds or not creds.valid:
-            creds = None
-            ret_str = "Invalid credentials."
-        # else:
-        #     ret_str = creds.userinfo().get('email')
-    except FileNotFoundError:
-        creds = None
-        ret_str = "Token file not found."
-    except Exception as e:
-        creds = None
-        ret_str = str(e)
-
-    if only_check:
-        return creds, ret_str
-
-    if creds and creds.valid:
-        login_again = messagebox.askyesno("Google Login", "Do you want to do a new Google login?")
-        if not login_again:
-            return Credentials.from_authorized_user_file(token_file), ret_str
-
-    # The user is not logged in or want to login again.
-    message = "You are going to be prompted in the browser.\nFollow the instructions and authorize the app."
-    messagebox.showinfo("OAuth Login", message)
-
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    else:
-        try:
-            flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
-            creds = flow.run_local_server(port=0)
-        except Exception as e:
-            print(f"Error: {e}")
-            return None, str(e)
-
-    # Save the credentials for future use
-    with open(token_file, 'w') as token:
-        print("printing creds to json file " + token_file)
-        token.write(creds.to_json())
-
-    return creds, creds.account
-
 
 def google_download_worksheet(creds: Credentials, file_id: str, sheet_name: str) -> pd.DataFrame:
     """
@@ -259,56 +187,9 @@ def generate_table_labels_pdf(
     return
 
 
-
 def extract_number_and_letter(value):
     match = re.match(r"(\d+)([A-Z])", value)
     if match:
         number, letter = match.groups()
         return int(number), letter
     return 0, ''  # Default return if the pattern does not match
-
-
-def check_whatsapp_login(token_file='whatsapp_secrets.json', phone_number_key='test'):
-    """
-    Check if the user is logged in to WhatsApp Business API by requesting the business profile.
-
-    Args:
-        secrets_file (str): The path to the secrets file.
-
-    Returns:
-        tuple: (bool, str) True if the login is successful, and an error message otherwise.
-    """
-    try:
-        # Load the secrets
-        with open(token_file, 'r') as f:
-            secrets = json.load(f)
-
-        access_token = secrets.get('access_token')
-        phone_number_id = secrets.get('phone_number_id')[phone_number_key]
-
-        if not access_token or not phone_number_id:
-            return False, "Missing access token or phone number ID in secrets file."
-
-        url = f'https://graph.facebook.com/v20.0/{phone_number_id}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical'
-
-        headers = {
-            'Authorization': f'Bearer {access_token}'
-        }
-
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            data = response.json()
-            if 'data' in data:
-                return True, "Login successful."
-            else:
-                return False, "Unexpected response format."
-        else:
-            return False, f"API request failed with status code {response.status_code}: {response.text}"
-
-    except FileNotFoundError:
-        return False, "Secrets file not found."
-    except json.JSONDecodeError:
-        return False, "Error decoding secrets file."
-    except Exception as e:
-        return False, str(e)
