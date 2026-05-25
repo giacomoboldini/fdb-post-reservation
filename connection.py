@@ -24,12 +24,15 @@ class Connection:
     def connect(self):
         raise NotImplementedError("Subclasses should implement this method")
 
+    def disconnect(self):
+        """Reset connection state without clearing credentials."""
+        self.state = False
+        self.message = ""
+
     def get_state(self):
-        self.login()
         return self.state
 
     def get_message(self):
-        self.login()
         return self.message
 
 
@@ -98,16 +101,17 @@ class GoogleConnection(Connection):
                 self.state = True
                 user_info_service = build('oauth2', 'v2', credentials=self.creds)
                 self.account = user_info_service.userinfo().get().execute().get('email')
-                self.message = "Connected as " + self.account
+                self.message = self.account or "unknown"
             elif not self.creds or not self.creds.valid:
                 # Refresh the token if expired
                 if self.creds and self.creds.expired and self.creds.refresh_token:
                     self.creds.refresh(Request())
-                    # Save the refreshed credentials
                     with open(token_file, 'wb') as token:
                         pickle.dump(self.creds, token)
                     self.state = True
-                    self.message = "Successfully refreshed Google credentials."
+                    user_info_service = build('oauth2', 'v2', credentials=self.creds)
+                    self.account = user_info_service.userinfo().get().execute().get('email')
+                    self.message = self.account or "unknown"
             else:
                 self.state = False
                 self.message = "Google connection failed."
@@ -152,7 +156,7 @@ class GoogleConnection(Connection):
             self.state = True
             user_info_service = build('oauth2', 'v2', credentials=self.creds)
             self.account = user_info_service.userinfo().get().execute().get('email')
-            self.message = "Connected as " + self.account
+            self.message = self.account or "unknown"
 
             # Save the new file paths (in case they were changed)
             self.set_creds_file(creds_file)
@@ -262,7 +266,7 @@ class WhatsAppConnection(Connection):
                 data = response.json()
                 if 'data' in data:
                     self.state = True
-                    self.message = f"Login successful ({phone_number_key})."
+                    self.message = phone_number_key
                     self.set_token_file(token_file)
                     self.set_phone_number_key(phone_number_key)
                 else:
@@ -294,8 +298,6 @@ class WhatsAppConnection(Connection):
         self.login(token_file, phone_number_key)
 
         if self.state:
-            self.state = True
-            self.message = "WhatsApp connection successful."
             return
 
         # If login failed, prompt for the configuration message

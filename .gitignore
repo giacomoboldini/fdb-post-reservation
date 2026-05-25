@@ -1,6 +1,8 @@
 *secret*
 *googleapis*
 *out*
+settings.ini
+*.log
 
 ###### Python gitignore template ######
 

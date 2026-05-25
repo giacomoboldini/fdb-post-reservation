@@ -1,12 +1,7 @@
-
-import json
 import os
 import re
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request, AuthorizedSession
-from tkinter import messagebox
-import requests
+from google.auth.transport.requests import AuthorizedSession
 import pygsheets
 import pandas as pd
 from fpdf import FPDF
@@ -18,16 +13,6 @@ from pdf2image import convert_from_path
 import traceback
 
 
-day_strings = {
-    "test": "Test 00 Luglio",
-    "gio": "Giovedì 03 Luglio",
-    "ven": "Venerdì 04 Luglio",
-    "sab": "Sabato 05 Luglio",
-    "dom": "Domenica 06 Luglio",
-    "lun": "Lunedì 07 Luglio"
-}
-
-
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -36,11 +21,10 @@ def bind_tooltip(root, info_label, message):
     tooltip = None
 
     def show_full_message(event, msg=message):
-        nonlocal tooltip  # Access the tooltip variable defined in the outer function
+        nonlocal tooltip
 
-        x, y, _, _ = info_label.bbox("insert")
-        x += info_label.winfo_rootx() + 25
-        y += info_label.winfo_rooty() + 25
+        x = info_label.winfo_rootx() + 25
+        y = info_label.winfo_rooty() + info_label.winfo_height() + 5
 
         tooltip = tk.Toplevel(root)
         tooltip.wm_overrideredirect(True)
@@ -52,8 +36,6 @@ def bind_tooltip(root, info_label, message):
         label.pack()
 
     def hide_full_message(event):
-        nonlocal tooltip  # Access the tooltip variable defined in the outer function
-
         if tooltip:
             tooltip.destroy()
 
@@ -136,7 +118,8 @@ def google_download_worksheet(creds: Credentials, file_id: str, sheet_name: str)
     return df, ""
 
 
-def google_generate_pdf_map(creds, file_id, sheet_id, output_dir, filename) -> None:
+def google_generate_pdf_map(creds, file_id, sheet_id, output_dir, filename,
+                            map_range: str = "t1:y50") -> None:
     """
     Generate a PDF of a specific range from a Google Sheet.
 
@@ -153,13 +136,14 @@ def google_generate_pdf_map(creds, file_id, sheet_id, output_dir, filename) -> N
         pdf_file_path (str): The path to the generated PDF file.
     """
 
-    range = "t1:y50"
-    dwn_url = 'https://docs.google.com/spreadsheets/d/' + file_id \
-              + '/export?format=pdf&gid=' + sheet_id \
-              + "&range=" + range \
-              + "&scale=4&fith=true" \
-              + "&horizontal_alignment=CENTER&vertical_alignment=TOP" \
-              + "&gridlines=false"
+    dwn_url = (
+        f"https://docs.google.com/spreadsheets/d/{file_id}"
+        f"/export?format=pdf&gid={sheet_id}"
+        f"&range={map_range}"
+        "&scale=4&fith=true"
+        "&horizontal_alignment=CENTER&vertical_alignment=TOP"
+        "&gridlines=false"
+    )
 
     authed_session = AuthorizedSession(creds)
     if not authed_session:
@@ -252,21 +236,21 @@ def generate_table_labels_pdf(
         try:
             booked_table_ids = row["Tavolo/i"].split(";")
         except AttributeError:
-            print(f"Error: Tavolo/i column not found in the row.")
+            print("Error: Tavolo/i column not found in the row.")
             booked_table_ids = []
         table_ids_text = '-'.join(map(str, booked_table_ids))
         pdf.set_font('Arial', 'B', 50)
 
         # Number of tables and table IDs combined
         pdf.cell(w=0, h=25, align="C", txt=f"{tables_num} TAVOL{'I' if tables_num > 1 else 'O'}", ln=2)
-        pdf.cell(w=0, h=25, align="C", txt=table_ids_text,ln=2)
+        pdf.cell(w=0, h=25, align="C", txt=table_ids_text, ln=2)
         pdf.set_font('Arial', 'B', 50)
 
         # Check if "Num spiedi" column exists
         if "Num spiedi" in df.columns and not pd.isna(row["Num spiedi"]):
-                num_spiedi = row["Num spiedi"]
-                pdf.set_font('Arial', 'B', 20)
-                pdf.cell(w=0, h=10, align="C", txt=f"{num_spiedi} SPIEDI", ln=2)
+            num_spiedi = row["Num spiedi"]
+            pdf.set_font('Arial', 'B', 20)
+            pdf.cell(w=0, h=10, align="C", txt=f"{num_spiedi} SPIEDI", ln=2)
 
     # Create the output directory if it doesn't exist.
     if not os.path.exists(output_dir):
@@ -287,61 +271,57 @@ def extract_number_and_letter(value):
     return 0, ''  # Default return if the pattern does not match
 
 
-# TODO: try to upload image, if it fails, send text message template.
-# TODO: if send_image is False, send only text message template.
-def send_whatsapp_messages(connection: WhatsAppConnection, df: pd.DataFrame, day: str, send_image) -> bool:
+def send_whatsapp_messages(connection: WhatsAppConnection, df: pd.DataFrame,
+                           day_string: str, send_image: bool,
+                           template_name: str = "image_2025",
+                           api_version: str = "v25.0",
+                           log_file: str = "wp_api.log",
+                           media_log_file: str = "wp_media_uploads.log") -> bool:
     """
     Send WhatsApp messages to customers with booking information.
 
     Args:
+        connection (WhatsAppConnection): Active WhatsApp connection.
         df (pd.DataFrame): DataFrame containing customer booking information.
-        day (str): Day key for the bookings to process.
-
-    Raises:
-        Exception: If unable to send the WhatsApp template message.
+        day_string (str): Human-readable day label used in the message template
+                          (e.g. "Giovedì 03 Luglio").
+        send_image (bool): Whether to include the seating map image.
+        template_name (str): WhatsApp template name to use.
+        api_version (str): Meta Graph API version (e.g. "v25.0").
+        log_file (str): Path for the API call log file.
+        media_log_file (str): Path for the media upload log file.
 
     Returns:
         bool: True if all messages were sent successfully, False otherwise.
     """
-
-    # image_filename = f"{os.path.dirname(__file__)}/out/{day}-map.png"
     image_filename = f"{os.path.dirname(__file__)}/empty-map.png"
-    wa = MyWhatsAppAPI(connection)
+    wa = MyWhatsAppAPI(connection, api_version=api_version,
+                       log_file=log_file, media_log_file=media_log_file)
     media_id = wa.upload_media(image_filename, 'image/png')
     skipped = []
-    # Send messages.
+
     for _, row in df.iterrows():
         name = row['Nome']
         telephone = row["Telefono"]
         num_tables = int(row["Num tavoli"])
         tables = row["Tavolo/i"].split(";")
-        tables_string = ("tavoli *" if num_tables > 1 else "tavolo *") + ", ".join(tables) + "*"
+        plural = "i" if num_tables > 1 else "o"
+        tables_string = f"tavol{plural} *" + ", ".join(tables) + "*"
 
-        print(f"Sending message to {name}: {telephone}...")
-        # message = gen_message(name, day_strings[day], tables)
+        logger.info(f"Sending message to {name} ({telephone})")
 
         try:
-            header_template_parameters = [
-                {"type": "text", "text": ("i" if num_tables > 1 else "o")}
-            ]
             body_template_parameters = [
-                {"type": "text", "text": day_strings[day]},
+                {"type": "text", "text": day_string},
                 {"type": "text", "text": str(num_tables)},
-                {"type": "text", "text": ("i" if num_tables > 1 else "o")},
+                {"type": "text", "text": plural},
                 {"type": "text", "text": name},
                 {"type": "text", "text": tables_string}
             ]
-
-            # TEMPORARY: show only the parameters to be sent.
-            print("Template parameters to be sent:")
-            print(json.dumps(header_template_parameters, indent=4, ensure_ascii=False))
-            print(json.dumps(body_template_parameters, indent=4, ensure_ascii=False))
-            # Send the template message.
-            success = wa.send_media_template(telephone, media_id, 'IMAGE',
-                                             'image_2025', 'it', body_template_parameters)
-            # success = wa.send_text_template(telephone, 'no_image_2025', 'it',
-            #                                 header_template_parameters,
-            #                                 body_template_parameters)
+            success = wa.send_media_template(
+                telephone, media_id, 'IMAGE', template_name, 'it',
+                body_template_parameters
+            )
             if not success:
                 raise Exception("Failed to send template message")
 
@@ -356,17 +336,3 @@ def send_whatsapp_messages(connection: WhatsAppConnection, df: pd.DataFrame, day
         return False
 
     return True
-
-
-def stop_and_ask_to_continue():
-    """
-    Ask the user to confirm whether to continue or stop the program.
-    """
-    root = tk.Tk()
-    root.withdraw()  # Hide the main window
-    result = messagebox.askyesno("Continue?", "Do you want to continue?")
-    if not result:
-        print("Stopping the program.")
-        root.destroy()
-        exit(0)
-    root.destroy()
