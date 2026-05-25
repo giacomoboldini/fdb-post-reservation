@@ -4,7 +4,6 @@ import json
 import os
 import pickle
 from tkinter import messagebox
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import requests
@@ -201,6 +200,32 @@ class WhatsAppConnection(Connection):
         """
         return self.phone_number_key
 
+    def get_phone_number_id(self):
+        """
+        Getter for the WhatsApp phone number ID.
+        """
+        if self.phone_number_id is None:
+            try:
+                self.login()
+                return self.phone_number_id
+            except Exception as e:
+                raise Exception(f"Error retrieving phone number ID: {str(e)}")
+
+        return self.phone_number_id
+
+    def get_access_token(self):
+        """
+        Getter for the WhatsApp access token.
+        """
+        if self.access_token is None:
+            try:
+                self.login()
+                return self.access_token
+            except Exception as e:
+                raise Exception(f"Error retrieving access token: {str(e)}")
+
+        return self.access_token
+
     def login(self, token_file=None, phone_number_key=None):
         """
         Handle WhatsApp login and update the connection state and message.
@@ -237,7 +262,7 @@ class WhatsAppConnection(Connection):
                 data = response.json()
                 if 'data' in data:
                     self.state = True
-                    self.message = "Login successful."
+                    self.message = f"Login successful ({phone_number_key})."
                     self.set_token_file(token_file)
                     self.set_phone_number_key(phone_number_key)
                 else:

@@ -3,3 +3,4 @@ pygsheets
 pandas
 pandastable
 fpdf
+pdf2image
