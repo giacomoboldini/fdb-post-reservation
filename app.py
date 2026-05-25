@@ -27,22 +27,26 @@ class App(tk.Tk):
         saved_geo = self.settings.get("App", {}).get("window_geometry", "1000x600")
         self.geometry(saved_geo)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.google_connection = None
+        self.whatsapp_connection = None
+        self._reinit_connections()
+
+        self.create_widgets()
+        self.update_ui()
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _reinit_connections(self):
         api = self.settings.get("API", {})
         self.google_connection = GoogleConnection(
             creds_file=api.get("google_cred_file"),
             token_file=api.get("google_token_file"))
         self.whatsapp_connection = WhatsAppConnection(
             token_file=api.get("whatsapp_token_file"),
-            phone_number_key=api.get("whatsapp_phone_key", "iliad"))
-
-        # Try to restore cached sessions on startup (no browser/UI)
+            phone_number_key=api.get("whatsapp_phone_key", ""))
         self.google_connection.login()
         self.whatsapp_connection.login()
-
-        self.create_widgets()
-        self.update_ui()
-
-    # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _on_close(self):
         self._save_setting("App", "window_geometry", self.geometry())
@@ -449,12 +453,23 @@ class App(tk.Tk):
         return {sect: dict(config.items(sect)) for sect in config.sections()}
 
     def _create_default_settings(self):
+        # Auto-detect the first WhatsApp phone key from the secrets file so
+        # the app works on first launch even without a pre-existing settings.ini.
+        wa_phone_key = ""
+        try:
+            with open("whatsapp_secrets.json") as f:
+                keys = list(json.load(f).get("phone_number_id", {}).keys())
+                if keys:
+                    wa_phone_key = keys[0]
+        except Exception:
+            pass
+
         config = configparser.ConfigParser()
         config["API"] = {
             "google_cred_file":       "google_secrets_cred.json",
             "google_token_file":      "sheets.googleapis.com-python.json",
             "whatsapp_token_file":    "whatsapp_secrets.json",
-            "whatsapp_phone_key":     "",
+            "whatsapp_phone_key":     wa_phone_key,
             "whatsapp_api_version":   "v25.0",
             "whatsapp_template_name": "image_2025",
             "wp_log_file":            "wp_api.log",
@@ -743,6 +758,8 @@ class App(tk.Tk):
                 config.write(f)
 
             self.settings = new_settings
+            self._reinit_connections()
+
             new_key = new_settings.get("API", {}).get("whatsapp_phone_key", "")
             wa_keys = self._get_whatsapp_keys()
             self.phone_key_combobox.config(values=wa_keys)
